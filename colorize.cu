@@ -3,6 +3,8 @@
 
 #include <iostream>
 #include <cstdio>
+#include <algorithm>
+#include <math.h>
 
 const float DMIN = 250;
 const float DMAX = 8000;
@@ -10,6 +12,126 @@ const float DMAX = 8000;
 // const float DMAX = 10000.0 / 65535.0;
 // const float DMIN = 0.3;
 // const float DMAX = 16.0;
+
+//JOFWJEFOIWEJF
+typedef struct {
+    double r;       // a fraction between 0 and 1
+    double g;       // a fraction between 0 and 1
+    double b;       // a fraction between 0 and 1
+} rgb;
+
+typedef struct {
+    double h;       // angle in degrees
+    double s;       // a fraction between 0 and 1
+    double v;       // a fraction between 0 and 1
+} hsv;
+
+static hsv   rgb2hsv(rgb in);
+static rgb   hsv2rgb(hsv in);
+
+
+
+
+hsv rgb2hsv(rgb in)
+{
+    hsv         out;
+    double      min, max, delta;
+
+    min = in.r < in.g ? in.r : in.g;
+    min = min  < in.b ? min  : in.b;
+
+    max = in.r > in.g ? in.r : in.g;
+    max = max  > in.b ? max  : in.b;
+
+    out.v = max;                                // v
+    delta = max - min;
+    if (delta < 0.00001)
+    {
+        out.s = 0;
+        out.h = 0; // undefined, maybe nan?
+        return out;
+    }
+    if( max > 0.0 ) { // NOTE: if Max is == 0, this divide would cause a crash
+        out.s = (delta / max);                  // s
+    } else {
+        // if max is 0, then r = g = b = 0              
+        // s = 0, h is undefined
+        out.s = 0.0;
+        out.h = NAN;                            // its now undefined
+        return out;
+    }
+    if( in.r >= max )                           // > is bogus, just keeps compilor happy
+        out.h = ( in.g - in.b ) / delta;        // between yellow & magenta
+    else
+    if( in.g >= max )
+        out.h = 2.0 + ( in.b - in.r ) / delta;  // between cyan & yellow
+    else
+        out.h = 4.0 + ( in.r - in.g ) / delta;  // between magenta & cyan
+
+    out.h *= 60.0;                              // degrees
+
+    if( out.h < 0.0 )
+        out.h += 360.0;
+
+    return out;
+}
+rgb hsv2rgb(hsv in)
+{
+    double      hh, p, q, t, ff;
+    long        i;
+    rgb         out;
+
+    if(in.s <= 0.0) {       // < is bogus, just shuts up warnings
+        out.r = in.v;
+        out.g = in.v;
+        out.b = in.v;
+        return out;
+    }
+    hh = in.h;
+    if(hh >= 360.0) hh = 0.0;
+    hh /= 60.0;
+    i = (long)hh;
+    ff = hh - i;
+    p = in.v * (1.0 - in.s);
+    q = in.v * (1.0 - (in.s * ff));
+    t = in.v * (1.0 - (in.s * (1.0 - ff)));
+
+    switch(i) {
+    case 0:
+        out.r = in.v;
+        out.g = t;
+        out.b = p;
+        break;
+    case 1:
+        out.r = q;
+        out.g = in.v;
+        out.b = p;
+        break;
+    case 2:
+        out.r = p;
+        out.g = in.v;
+        out.b = t;
+        break;
+
+    case 3:
+        out.r = p;
+        out.g = q;
+        out.b = in.v;
+        break;
+    case 4:
+        out.r = t;
+        out.g = p;
+        out.b = in.v;
+        break;
+    case 5:
+    default:
+        out.r = in.v;
+        out.g = p;
+        out.b = q;
+        break;
+    }
+    return out;     
+}
 
 struct colorize_functor
 {
@@ -24,12 +146,93 @@ struct colorize_functor
             if (depth > DMAX) d = DMAX;
 
             // Gonna make it between 0-1 for now
-            float dnormal = (d - DMIN) / (DMAX - DMIN) // * 1529;
+            float dnormal = (d - DMIN) / (DMAX - DMIN); // * 1529;
             printf("Running with depth: %d normalized to %f\n", depth, dnormal);
             
+            // Convert HSV to RGB
+            hsv in = {dnormal * 360, 1, 1};
+            
+            double      hh, p, q, t, ff;
+            long        i;
+            rgb         out;
 
+            if(in.s <= 0.0) {       // < is bogus, just shuts up warnings
+                out.r = in.v;
+                out.g = in.v;
+                out.b = in.v;
+                return 0;
+            }
+            hh = in.h;
+            if(hh >= 360.0) hh = 0.0;
+            hh /= 60.0;
+            i = (long)hh;
+            ff = hh - i;
+            p = in.v * (1.0 - in.s);
+            q = in.v * (1.0 - (in.s * ff));
+            t = in.v * (1.0 - (in.s * (1.0 - ff)));
+
+            switch(i) {
+            case 0:
+                out.r = in.v;
+                out.g = t;
+                out.b = p;
+                break;
+            case 1:
+                out.r = q;
+                out.g = in.v;
+                out.b = p;
+                break;
+            case 2:
+                out.r = p;
+                out.g = in.v;
+                out.b = t;
+                break;
+
+            case 3:
+                out.r = p;
+                out.g = q;
+                out.b = in.v;
+                break;
+            case 4:
+                out.r = t;
+                out.g = p;
+                out.b = in.v;
+                break;
+            case 5:
+            default:
+                out.r = in.v;
+                out.g = p;
+                out.b = q;
+                break;
+            }
+            return (int)(out.r * 255) << 16 | (int)(out.g * 255) << 8 | (int)(out.b * 255);
+            // float H = dnormal * 360;
+            
+            // float S = 1;
+            // float V = 1;
+            // float M = 255 * V;
+            // float m = M * (1 - S);
+            // float z = (M - m) * abs(H / 60 - (int)(H / 60) + ((int)(H / 60) % 2) - 1);
+            
+            // int to_ret;
+            // if (H < 60) {
+            //     to_ret = (int)M << 16 | (int)(z + m) << 8 | (int)m;
+            // } else if (H < 120) {
+            //     to_ret = (int)(z + m) << 16 | (int)M << 8 | (int)m;
+            // } else if (H < 180) {
+            //     to_ret = (int)m << 16 | (int)M << 8 | (int)(z + m);
+            // } else if (H < 240) {
+            //     to_ret = (int)m << 16 | (int)(z+m) << 8 | (int)M;
+            // } else if (H < 300) {
+            //     to_ret = (int)(z + m) << 16 | (int)m << 8 | (int)M;
+            // } else {
+            //     to_ret = (int)M << 16 | (int)m << 8 | (int)(z + m);
+            // }
+            // printf("depth %d is mapped to hue: %f\n", depth, hsv.h);
+            
             // return 0;
             // return depth;
+            // return to_ret;
 
             uint8_t pr = 50;
             // if ((0 <= dnormal && dnormal <= 255) || (1275 < dnormal && dnormal <= 1529)) {
@@ -84,20 +287,20 @@ struct colorize_functor
             // pb = 3;
 
             // RGBA
-            int to_ret = 0;
-            to_ret |= pr;
-            to_ret <<= 8;
-            to_ret |= pg;
-            to_ret <<= 8;
-            to_ret |= pb;
-            to_ret <<= 8;
-            to_ret |= 255;
-            return to_ret;
+            // int to_ret = 0;
+            // to_ret |= pr;
+            // to_ret <<= 8;
+            // to_ret |= pg;
+            // to_ret <<= 8;
+            // to_ret |= pb;
+            // to_ret <<= 8;
+            // to_ret |= 255;
+            // return to_ret;
         }
 };
 
 
-uint8_t* colorize(const uint16_t* input, size_t len) {
+int* colorize(const uint16_t* input, size_t len) {
     // Depth 16 
     thrust::host_vector<short> h_input(len);
     for (int i = 0; i < len; i++) {
@@ -115,18 +318,56 @@ uint8_t* colorize(const uint16_t* input, size_t len) {
     std::cout << "houtput: " << h_output[0] << " " << h_output[1] << " " << h_output[2] << " " << h_output[3] << std::endl;
     thrust::copy(d_output.begin(), d_output.end(), h_output.begin());
 
-    int* output = new int[len * 4];
+    int* output = new int[len];
     for (int i = 0; i < len; i++) {
         output[i] = h_output[i];
     }
-    return (uint8_t*)output;
+    return output;
+}
+
+
+
+
+
+uint16_t to_depth(int rgb_int) {
+    // Not sure if the orders are right
+    uint8_t r = (rgb_int >> 16) & 0xFF;
+    uint8_t g = (rgb_int >> 8) & 0xFF;
+    uint8_t b = rgb_int & 0xFF;
+
+    rgb in = {r / 255.0, g / 255.0, b / 255.0};
+    hsv out = rgb2hsv(in);
+    float H_norm = out.h / 360;
+
+    // uint8_t M = std::max(r, std::max(g, b));
+    // uint8_t m = std::min(r, std::min(g, b));
+
+    // // float V = M / 255.0;
+    // // float S = 0;
+    // // if (M > 0) {
+    // //     S = (M - m) / (float)M;
+    // // }
+    // float H = 0;
+    // if (r >= b) {
+    //     H = acos((r - 0.5 * g - 0.5 * b) / sqrt(r * r + g * g + b * b - r * g - r * b - g * b));
+    // }
+    // else {
+    //     H = 360 - acos((r - 0.5 * g - 0.5 * b) / sqrt(r * r + g * g + b * b - r * g - r * b - g * b));
+    // }
+    // float H_norm = H / 360;
+    printf("r:%d, g:%d, b:%d -> H_norm: %f\n",r,g,b, H_norm);
+    return DMIN + (DMAX - DMIN) * H_norm;
 }
 
 int main() {
     uint16_t input[8] = { 100, 200, 400, 800, 1600, 3200, 6400, 12800 };
-    uint8_t* output = colorize(input, 8);
+    int* output = colorize(input, 8);
     for (int i = 0; i < 8; i++) {
-        std::cout << (int)output[i * 4] << " " << (int)output[i * 4 + 1] << " " << (int)output[i * 4 + 2] << " " << (int)output[i * 4 + 3] << std::endl;
+        std::cout << "r:" << (output[i] >> 16 & 0xFF) << " g:" << (output[i] >> 8 & 0xFF) << " b:" << (output[i] & 0xFF) << std::endl;
+    }
+    // Convert back to depth
+    for (int i = 0; i < 8; i++) {
+        std::cout << to_depth(output[i]) << std::endl;
     }
     return 0;
 }
