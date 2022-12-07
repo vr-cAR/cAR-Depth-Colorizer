@@ -359,6 +359,18 @@ uint16_t to_depth(int rgb_int) {
     return DMIN + (DMAX - DMIN) * H_norm;
 }
 
+uint8_t* exported_colorize(uint8_t* depth_buf, uint32_t depth_buf_len) {
+    return (uint8_t*)colorize((uint16_t*)depth_buf, depth_buf_len / 2);
+}
+
+uint8_t* test(uint8_t* arr, uint32_t len) {
+    for (int i = 0; i < len; i++) {
+        std::cout << (int)arr[i] << std::endl;
+        arr[i] += 1;
+    }
+    return arr;
+}
+
 int main() {
     uint16_t input[8] = { 100, 200, 400, 800, 1600, 3200, 6400, 12800 };
     int* output = colorize(input, 8);
