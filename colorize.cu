@@ -6,8 +6,8 @@
 #include <algorithm>
 #include <math.h>
 
-const float DMIN = 250;
-const float DMAX = 8000;
+// const float DMIN = 250;
+// const float DMAX = 8000;
 // const float DMIN = 5.0 / 65535.0;
 // const float DMAX = 10000.0 / 65535.0;
 // const float DMIN = 0.3;
@@ -135,6 +135,10 @@ rgb hsv2rgb(hsv in)
 
 struct colorize_functor
 {
+    const float DMIN;
+    const float DMAX;
+    colorize_functor(float DMIN, float DMAX) : DMIN(DMIN), DMAX(DMAX) {}
+
     __host__ __device__
         int operator()(const short& depth) const { 
             float d = depth;
@@ -313,7 +317,7 @@ struct colorize_functor
 };
 
 
-int* colorize(const uint16_t* input, size_t len) {
+int* colorize(const uint16_t* input, size_t len, float dmin, float dmax) {
     // Depth 16 
     thrust::host_vector<short> h_input(len);
     for (int i = 0; i < len; i++) {
@@ -325,7 +329,7 @@ int* colorize(const uint16_t* input, size_t len) {
     std::cout << "dinput: " << d_input[0] << " " << d_input[1] << " " << d_input[2] << " " << d_input[3] << std::endl;
     // Output RGBA
     thrust::device_vector<int> d_output(len);
-    thrust::transform(d_input.begin(), d_input.end(), d_output.begin(), colorize_functor());
+    thrust::transform(d_input.begin(), d_input.end(), d_output.begin(), colorize_functor(dmin, dmax));
     std::cout << "doutput: " << d_output[0] << " " << d_output[1] << " " << d_output[2] << " " << d_output[3] << std::endl;
     thrust::host_vector<int> h_output(len);
     std::cout << "houtput: " << h_output[0] << " " << h_output[1] << " " << h_output[2] << " " << h_output[3] << std::endl;
@@ -369,10 +373,11 @@ uint16_t to_depth(int rgb_int) {
     // }
     // float H_norm = H / 360;
     printf("r:%d, g:%d, b:%d -> H_norm: %f\n",r,g,b, H_norm);
-    return DMIN + (DMAX - DMIN) * H_norm;
+    return 0; // UNUSED
+    // return DMIN + (DMAX - DMIN) * H_norm;
 }
 
-uint16_t to_depth_paper(int rgb_int) {
+uint16_t to_depth_paper(int rgb_int, float dmin, float dmax) {
     int r = (rgb_int >> 16) & 0xFF;
     int g = (rgb_int >> 8) & 0xFF;
     int b = rgb_int & 0xFF;
@@ -392,15 +397,15 @@ uint16_t to_depth_paper(int rgb_int) {
     else {
         printf("OIWEJFOIJWEOFIEJWOJ Bad color: %d, %d, %d", r, g, b);
     }
-    float disp_min = 1/DMAX;
-    float disp_max = 1/DMIN;
+    float disp_min = 1/dmax;
+    float disp_max = 1/dmin;
     float recovered_depth = 1529.0 / (1529.0 * disp_min + (disp_max - disp_min) * drnormal);
 
     return recovered_depth;
 }
 
-uint8_t* exported_colorize(uint8_t* depth_buf, uint32_t depth_buf_len) {
-    return (uint8_t*)colorize((uint16_t*)depth_buf, depth_buf_len / 2);
+uint8_t* exported_colorize(uint8_t* depth_buf, uint32_t depth_buf_len, float dmin, float dmax) {
+    return (uint8_t*)colorize((uint16_t*)depth_buf, depth_buf_len / 2, dmin, dmax);
 }
 
 uint8_t* test(uint8_t* arr, uint32_t len) {
@@ -412,14 +417,16 @@ uint8_t* test(uint8_t* arr, uint32_t len) {
 }
 
 int main() {
-    uint16_t input[8] = { 100, 200, 400, 800, 1600, 3200, 6400, 12800 };
-    int* output = colorize(input, 8);
+    uint16_t input[8] = {300, 301, 302, 310, 500, 1000, 6400, 12800 };
+    float dmin = 250;
+    float dmax = 5000;
+    int* output = colorize(input, 8, dmin, dmax);
     for (int i = 0; i < 8; i++) {
         std::cout << "r:" << (output[i] >> 16 & 0xFF) << " g:" << (output[i] >> 8 & 0xFF) << " b:" << (output[i] & 0xFF) << std::endl;
     }
     // Convert back to depth
     for (int i = 0; i < 8; i++) {
-        std::cout << to_depth_paper(output[i]) << std::endl;
+        std::cout << to_depth_paper(output[i], dmin, dmax) << std::endl;
     }
     return 0;
 }
